@@ -1,0 +1,310 @@
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Drone Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        .control-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .control-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        #simulator-container {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        #simulator-container:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+
+    <div id="main-container" class="flex flex-col lg:flex-row h-screen w-screen">
+        
+        <!-- 3D Simulator Canvas -->
+        <div id="simulator-container" class="flex-grow h-1/2 lg:h-full lg:w-3/4"></div>
+
+        <!-- Controls Panel -->
+        <div id="controls-panel" class="w-full lg:w-1/4 bg-gray-800 p-4 lg:p-6 overflow-y-auto h-1/2 lg:h-full">
+            <h1 class="text-2xl font-bold mb-4 text-blue-400">Drone Controls</h1>
+            <p class="text-sm text-gray-400 mb-6">
+                Adjust the sliders to simulate drone movements. The percentage values correspond to what you might use in Blockly or other coding platforms.
+            </p>
+
+            <!-- Throttle Control -->
+            <div class="mb-6">
+                <label for="throttle" class="block mb-2 text-lg font-medium">Throttle</label>
+                <div class="flex items-center space-x-4">
+                    <input id="throttle" type="range" min="0" max="100" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer control-slider">
+                    <span id="throttle-value" class="font-mono text-lg w-16 text-center bg-gray-700 rounded-md py-1">0%</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Controls altitude (up/down).</p>
+            </div>
+
+            <!-- Pitch Control -->
+            <div class="mb-6">
+                <label for="pitch" class="block mb-2 text-lg font-medium">Pitch</label>
+                <div class="flex items-center space-x-4">
+                    <input id="pitch" type="range" min="-100" max="100" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer control-slider">
+                    <span id="pitch-value" class="font-mono text-lg w-16 text-center bg-gray-700 rounded-md py-1">0%</span>
+                </div>
+                 <p class="text-xs text-gray-500 mt-2">Controls forward and backward movement.</p>
+            </div>
+
+            <!-- Roll Control -->
+            <div class="mb-6">
+                <label for="roll" class="block mb-2 text-lg font-medium">Roll</label>
+                <div class="flex items-center space-x-4">
+                    <input id="roll" type="range" min="-100" max="100" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer control-slider">
+                    <span id="roll-value" class="font-mono text-lg w-16 text-center bg-gray-700 rounded-md py-1">0%</span>
+                </div>
+                 <p class="text-xs text-gray-500 mt-2">Controls left and right movement.</p>
+            </div>
+
+            <!-- Yaw Control -->
+            <div class="mb-6">
+                <label for="yaw" class="block mb-2 text-lg font-medium">Yaw</label>
+                <div class="flex items-center space-x-4">
+                    <input id="yaw" type="range" min="-100" max="100" value="0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer control-slider">
+                    <span id="yaw-value" class="font-mono text-lg w-16 text-center bg-gray-700 rounded-md py-1">0%</span>
+                </div>
+                 <p class="text-xs text-gray-500 mt-2">Controls rotation (turning left/right).</p>
+            </div>
+
+            <!-- Reset Button -->
+            <div class="mt-8">
+                <button id="reset-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300">
+                    Reset Simulation
+                </button>
+            </div>
+             <div class="text-center text-xs text-gray-500 mt-6">
+                Click and drag on the simulator to rotate the view.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Basic Setup ---
+        const container = document.getElementById('simulator-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        // --- Lighting ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7);
+        scene.add(directionalLight);
+
+        // --- Drone Model ---
+        const drone = new THREE.Group();
+        scene.add(drone);
+        
+        // Body
+        const bodyGeometry = new THREE.BoxGeometry(1, 0.2, 1);
+        const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.5, roughness: 0.5 });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        drone.add(body);
+
+        // Arms
+        const armGeometry = new THREE.BoxGeometry(0.1, 0.05, 1.5);
+        const armMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        
+        const arm1 = new THREE.Mesh(armGeometry, armMaterial);
+        arm1.rotation.y = Math.PI / 4;
+        drone.add(arm1);
+
+        const arm2 = new THREE.Mesh(armGeometry, armMaterial);
+        arm2.rotation.y = -Math.PI / 4;
+        drone.add(arm2);
+
+        // Propellers
+        const propellers = new THREE.Group();
+        drone.add(propellers);
+        const propellerGeometry = new THREE.BoxGeometry(0.6, 0.02, 0.1);
+        const redMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+        const blackMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
+
+        const propellerPositions = [
+            { x: 0.53, z: 0.53, material: redMaterial },
+            { x: -0.53, z: -0.53, material: redMaterial },
+            { x: 0.53, z: -0.53, material: blackMaterial },
+            { x: -0.53, z: 0.53, material: blackMaterial },
+        ];
+        
+        propellerPositions.forEach(pos => {
+            const propeller = new THREE.Mesh(propellerGeometry, pos.material);
+            propeller.position.set(pos.x, 0.15, pos.z);
+            propellers.add(propeller);
+        });
+
+        // --- Ground Grid ---
+        const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x444444);
+        scene.add(gridHelper);
+        
+        // --- Initial Camera Position ---
+        camera.position.set(2, 2, 4);
+        camera.lookAt(scene.position);
+
+        // --- Control State ---
+        const controls = {
+            throttle: 0,
+            pitch: 0,
+            roll: 0,
+            yaw: 0
+        };
+        const initialDronePosition = new THREE.Vector3(0, 0.5, 0);
+        drone.position.copy(initialDronePosition);
+        
+        // --- UI Element References ---
+        const throttleSlider = document.getElementById('throttle');
+        const pitchSlider = document.getElementById('pitch');
+        const rollSlider = document.getElementById('roll');
+        const yawSlider = document.getElementById('yaw');
+        
+        const throttleValue = document.getElementById('throttle-value');
+        const pitchValue = document.getElementById('pitch-value');
+        const rollValue = document.getElementById('roll-value');
+        const yawValue = document.getElementById('yaw-value');
+
+        // --- Event Listeners ---
+        throttleSlider.addEventListener('input', (e) => {
+            controls.throttle = parseInt(e.target.value);
+            throttleValue.textContent = `${controls.throttle}%`;
+        });
+        pitchSlider.addEventListener('input', (e) => {
+            controls.pitch = parseInt(e.target.value);
+            pitchValue.textContent = `${controls.pitch}%`;
+        });
+        rollSlider.addEventListener('input', (e) => {
+            controls.roll = parseInt(e.target.value);
+            rollValue.textContent = `${controls.roll}%`;
+        });
+        yawSlider.addEventListener('input', (e) => {
+            controls.yaw = parseInt(e.target.value);
+            yawValue.textContent = `${controls.yaw}%`;
+        });
+
+        document.getElementById('reset-button').addEventListener('click', () => {
+            // Reset sliders
+            throttleSlider.value = 0;
+            pitchSlider.value = 0;
+            rollSlider.value = 0;
+            yawSlider.value = 0;
+            // Reset control values
+            controls.throttle = 0;
+            controls.pitch = 0;
+            controls.roll = 0;
+            controls.yaw = 0;
+            // Reset UI text
+            throttleValue.textContent = '0%';
+            pitchValue.textContent = '0%';
+            rollValue.textContent = '0%';
+            yawValue.textContent = '0%';
+            // Reset drone physics state in the animation loop
+        });
+
+        // --- Mouse Camera Controls ---
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        container.addEventListener('mousedown', (e) => { isDragging = true; });
+        container.addEventListener('mouseup', (e) => { isDragging = false; });
+        container.addEventListener('mouseleave', (e) => { isDragging = false; });
+        container.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const deltaMove = {
+                x: e.offsetX - previousMousePosition.x,
+                y: e.offsetY - previousMousePosition.y
+            };
+
+            // Rotate the camera around the drone
+            const cameraOffset = new THREE.Vector3().subVectors(camera.position, drone.position);
+            const angleY = -deltaMove.x * 0.005;
+            const angleX = -deltaMove.y * 0.005;
+
+            const quatY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angleY);
+            const cameraRight = new THREE.Vector3().crossVectors(camera.up, cameraOffset).normalize();
+            const quatX = new THREE.Quaternion().setFromAxisAngle(cameraRight, angleX);
+            
+            cameraOffset.applyQuaternion(quatY).applyQuaternion(quatX);
+            camera.position.copy(drone.position).add(cameraOffset);
+            camera.lookAt(drone.position);
+        });
+        
+        container.addEventListener('mousemove', (e) => {
+            previousMousePosition = { x: e.offsetX, y: e.offsetY };
+        });
+
+
+        // --- Animation Loop ---
+        const clock = new THREE.Clock();
+        let targetPosition = new THREE.Vector3().copy(initialDronePosition);
+        let targetRotation = new THREE.Euler();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const deltaTime = clock.getDelta();
+
+            // --- Update Target State from Controls ---
+            // Throttle affects target Y position
+            targetPosition.y = initialDronePosition.y + (controls.throttle / 100) * 3;
+
+            // Yaw affects target Y rotation
+            targetRotation.y -= (controls.yaw / 100) * 0.05; // Continuous rotation
+
+            // Pitch affects target X rotation (tilt)
+            targetRotation.x = -(controls.pitch / 100) * (Math.PI / 6);
+
+            // Roll affects target Z rotation (tilt)
+            targetRotation.z = -(controls.roll / 100) * (Math.PI / 6);
+
+            // --- Smoothly Interpolate Drone's Transform ---
+            drone.position.lerp(targetPosition, 0.05);
+            drone.quaternion.slerp(new THREE.Quaternion().setFromEuler(targetRotation), 0.1);
+
+            // --- Animate Propellers ---
+            const propellerSpeed = 0.1 + (controls.throttle / 100) * 0.5;
+            propellers.children.forEach((prop, index) => {
+                // Make alternating propellers spin in opposite directions
+                prop.rotation.y += (index % 2 === 0 ? 1 : -1) * propellerSpeed;
+            });
+            
+            renderer.render(scene, camera);
+        }
+        
+        // --- Handle Window Resizing ---
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }, false);
+
+        // Start the simulation
+        animate();
+    </script>
+</body>
+</html>
