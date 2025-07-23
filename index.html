@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -150,14 +150,16 @@
         const blackMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
 
         const propellerPositions = [
-            { x: 0.53, z: 0.53, material: redMaterial },
-            { x: -0.53, z: -0.53, material: redMaterial },
-            { x: 0.53, z: -0.53, material: blackMaterial },
-            { x: -0.53, z: 0.53, material: blackMaterial },
+            { x: 0.53, z: -0.53 },  // Front-Right
+            { x: -0.53, z: -0.53 }, // Front-Left
+            { x: 0.53, z: 0.53 },   // Back-Right
+            { x: -0.53, z: 0.53 },  // Back-Left
         ];
         
         propellerPositions.forEach(pos => {
-            const propeller = new THREE.Mesh(propellerGeometry, pos.material);
+            // If z is negative, it's a front propeller, color it red. Otherwise, black.
+            const material = pos.z < 0 ? redMaterial : blackMaterial;
+            const propeller = new THREE.Mesh(propellerGeometry, material);
             propeller.position.set(pos.x, 0.15, pos.z);
             propellers.add(propeller);
         });
